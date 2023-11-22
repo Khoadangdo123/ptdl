@@ -20,7 +20,8 @@ const upload = multer({ storage });
 
 
 app.use(cors());
-app.post('/upload', upload.single('file'), (req, res) => {
+// Code Đã Xong Phần này
+app.post('/upload', upload.single('file'), async (req, res) => {
   const file = req.file;
   if (!file) {
     res.status(400).send('No file uploaded');
@@ -29,62 +30,158 @@ app.post('/upload', upload.single('file'), (req, res) => {
 
   const filePath = `uploads/${file.originalname}`;
   const data = fs.readFileSync(filePath, 'utf8');
+	const dataCheck = await req.body.newColumnName;
   const parsedData = Papa.parse(data, { header: true });
 
+	const valueKey = parsedData.meta.fields;
+
 	
-
-  const newData = parsedData.data.map((row, index) => 
+	function findAbsoluteString(inputString, stringArray) {
+		return stringArray.includes(inputString);
+	}
+	
+	const found = await findAbsoluteString(dataCheck, valueKey);
+	
+	if (found) {
+		res.json({
+			message: 'Bạn Đã Nhập Thêm Thuộc Tính Trùng'
+		})
+	} else {
+		const newData = parsedData.data.map((row, index) => 
 		
-		// ({
-		// 	...row,
-		// 	[req.body.newColumnName]: propertyValue
-		// })
-
-		{
-			if (index === 0) {
-				return { ...row, [req.body.newColumnName]: '' };
-			} else {
-				return { ...row, [req.body.newColumnName]: '' };
+			{
+				if (index === 0 || !(row === req.body.newColumnName)) {
+					return { ...row, [req.body.newColumnName]: '' };
+				} else {
+					return { ...row, [req.body.newColumnName]: '' };
+				}
 			}
-		}
-	);
+		);
 
-  const newCSV = Papa.unparse(newData);
-	fs.writeFileSync(filePath, newCSV);
+		const newCSV = Papa.unparse(newData);
+		fs.writeFileSync(filePath, newCSV);
+		res.json({
+			message: 'Cập nhật thành công'
+		})
+	}
+
+
+	// const newCSV = Papa.unparse(newData);
+	// fs.writeFileSync(filePath, newCSV);
 	// fs.unlinkSync(filePath);
 
-  res.send('Column added successfully');
 });
 
 app.post('/addValue', upload.single('file'), (req, res) => {
-	const file = req.file;
-  if (!file) {
-    res.status(400).send('No file uploaded');
-    return;
-  }
-	const filePath = `uploads/${file.originalname}`;
-	const data = fs.readFileSync(filePath, 'utf8');
-  const parsedData = Papa.parse(data, { header: true });
+	try {
 
-	const newData = parsedData.data.map((row, index) => {
-		if (row['Order ID'] === req.body.dataValue) {
-			return (
-				{
-					...row,
-					[req.body.dataColoumn]: req.body.dataNew
-				}
-			)
-		} else {
-			return row;
+		const file = req.file;
+		if (!file) {
+			res.status(400).send('No file uploaded');
+			return;
 		}
-	});
+		const filePath = `uploads/${file.originalname}`;
+		const data = fs.readFileSync(filePath, 'utf8');
+		const parsedData = Papa.parse(data, { header: true });
+	
+		const newData = parsedData.data.map((row, index) => {
+			if (row['Order ID'] === req.body.dataValue) {
+				return (
+					{
+						...row,
+						[req.body.dataColoumn]: req.body.dataNew
+					}
+				)
+			} else {
+				return {
+					...row
+				}
+			}
+		});
+	
+	
+		const newCSV = Papa.unparse(newData);
+		fs.writeFileSync(filePath, newCSV);
+		// fs.unlinkSync(filePath);
 
-  const newCSV = Papa.unparse(newData);
-	fs.writeFileSync(filePath, newCSV);
-	// fs.unlinkSync(filePath);
+		const found = parsedData.data.filter(obj => obj['Order ID'] === req.body.dataValue);
+		
+		let regEx = /^\d+$/;
+		if (regEx.test(found[0]['Order ID'])) {
+	
+			res.json({
+				message: 'Đã Cập Nhật Thành công'
+			})
+		} else {
 
-	res.send(parsedData)
-});
+			res.json({
+				message: 'Cập Nhật Thất bại'
+			})
+		}
+	
+		// res.send(typeof found[0]['Order ID'])
+	} catch (error) {
+		res.json({
+			message: 'Cập Nhật Thất bại'
+		})
+	}	
+
+})
+
+
+app.post('/addValueAll', upload.single('file'), (req, res) => {
+	try {
+
+		const file = req.file;
+		if (!file) {
+			res.status(400).send('No file uploaded');
+			return;
+		}
+		const filePath = `uploads/${file.originalname}`;
+		const data = fs.readFileSync(filePath, 'utf8');
+		const parsedData = Papa.parse(data, { header: true });
+		const dataCheck = req.body.dataColoumn;
+
+
+		const valueKey = parsedData.meta.fields;
+
+	
+		function findAbsoluteString(inputString, stringArray) {
+			return stringArray.includes(inputString);
+		}
+		const found = findAbsoluteString(dataCheck, valueKey);
+
+		if (found) {
+			const newData = parsedData.data.map((row, index) => {
+				return (
+					{
+						...row,
+						[req.body.dataColoumn]: req.body.dataNew
+					}
+				)
+			});
+
+			const newCSV = Papa.unparse(newData);
+			fs.writeFileSync(filePath, newCSV);
+
+			res.json({
+				message: 'success'
+			})
+			// fs.unlinkSync(filePath);
+		} else {
+			res.json({
+				message: 'Không tìm thấy cột thêm'
+			})
+		}
+	
+	} catch (error) {
+		res.json({
+			message: error.message
+		})
+	}	
+
+})
+
 
 app.post('/deleteValue', upload.single('file'), (req, res) => {
 	const file = req.file;
